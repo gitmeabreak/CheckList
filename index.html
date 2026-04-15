@@ -27,7 +27,6 @@
             touch-action: manipulation;
         }
 
-        /* Login Overlay Styling */
         #login-overlay {
             position: fixed;
             inset: 0;
@@ -129,6 +128,24 @@
             margin-bottom: 0.5rem; display: block;
         }
 
+        .workon-box {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 11px;
+            width: 100%;
+            min-height: 60px;
+            color: #cbd5e1;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .workon-box:focus {
+            border-color: var(--accent-blue);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
         input[type="number"], input[type="text"], input[type="password"] {
             -webkit-appearance: none;
             border-radius: 12px;
@@ -137,7 +154,7 @@
         .save-indicator {
             position: fixed; bottom: 1rem; right: 1rem; font-size: 0.7rem; color: #64748b;
             background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 20px;
-            display: flex; align-items: center; gap: 6px;
+            display: flex; align-items: center; gap: 6px; z-index: 1000;
         }
         .save-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
 
@@ -147,6 +164,13 @@
             25% { transform: translateX(-8px); }
             75% { transform: translateX(8px); }
         }
+
+        .day-btn {
+            width: 32px; height: 32px; border-radius: 8px; font-size: 12px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
+        }
+        .day-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: white; }
     </style>
 </head>
 <body class="pb-24">
@@ -237,7 +261,6 @@
             }
         }
 
-        // Listen for Enter key on login
         document.getElementById('pass-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') checkPassword();
         });
@@ -276,7 +299,7 @@
             ].map(m => ({
                 ...m, sales: { nhc: 0, wireless: 0, shm: 0 },
                 recruiting: {}, management: {}, metrics: {}, meetings: {},
-                interviewStep: 0
+                interviewStep: 0, notes: ""
             }))
         };
 
@@ -312,7 +335,7 @@
         function addNewHire() {
             const name = document.getElementById('hire-name').value;
             if (!name) return;
-            members.training.push({ id: Date.now(), name, prezi: [], tablet: [] });
+            members.training.push({ id: Date.now(), name, prezi: [], tablet: [], fieldDays: 1, notes: "" });
             saveData(); renderAll();
             document.getElementById('hire-name').value = '';
             triggerConfetti();
@@ -324,6 +347,23 @@
             saveData(); renderAll();
         }
 
+        function updateNotes(type, id, text) {
+            const m = members[type].find(x => x.id === id);
+            if (m) {
+                m.notes = text;
+                saveData();
+            }
+        }
+
+        function updateFieldDays(id, days) {
+            const m = members.training.find(x => x.id === id);
+            if (m) {
+                m.fieldDays = parseInt(days);
+                saveData();
+                renderTraining();
+            }
+        }
+
         // --- RENDERING ---
         function renderTraining() {
             document.getElementById('training-grid').innerHTML = members.training.map(m => {
@@ -331,11 +371,29 @@
                 const totalReq = PREZI_STEPS.length + TABLET_TRAINING_CHECKLIST.length;
                 const cur = mPrezi.length + mTablet.length;
                 const ready = cur === totalReq;
+                const fieldDays = m.fieldDays || 1;
+                const statusColor = fieldDays > 4 ? 'text-red-400' : (fieldDays >= 3 ? 'text-yellow-400' : 'text-emerald-400');
 
                 return `
                 <div class="glass-card p-6">
                     <button onclick="removeMember('training', ${m.id})" class="remove-btn">Remove</button>
-                    <h3 class="text-xl font-bold mb-4">${m.name}</h3>
+                    <div class="flex justify-between items-start mb-4 pr-16">
+                        <h3 class="text-xl font-bold">${m.name}</h3>
+                        <div class="text-right">
+                            <span class="training-section-label !mb-0">In-Field Day</span>
+                            <div class="flex items-center gap-1 mt-1">
+                                <button onclick="updateFieldDays(${m.id}, ${Math.max(1, fieldDays - 1)})" class="day-btn">-</button>
+                                <span class="w-8 text-center font-black text-lg ${statusColor}">${fieldDays}</span>
+                                <button onclick="updateFieldDays(${m.id}, ${fieldDays + 1})" class="day-btn">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <span class="training-section-label">Work-Ons</span>
+                        <textarea class="workon-box" placeholder="What does ${m.name} need to focus on?" oninput="updateNotes('training', ${m.id}, this.value)">${m.notes || ''}</textarea>
+                    </div>
+
                     <div class="space-y-6">
                         <div>
                             <span class="training-section-label">5 Steps of the Pitch</span>
@@ -398,6 +456,12 @@
                 <div class="glass-card p-6 border-l-4 border-blue-500">
                     <button onclick="removeMember('solo', ${m.id})" class="remove-btn">Remove</button>
                     <h3 class="text-xl font-bold mb-4">${m.name}</h3>
+                    
+                    <div class="mb-6">
+                        <span class="training-section-label">Work-Ons</span>
+                        <textarea class="workon-box" placeholder="What does ${m.name} need to focus on?" oninput="updateNotes('solo', ${m.id}, this.value)">${m.notes || ''}</textarea>
+                    </div>
+
                     <div class="mb-6">
                         <div class="flex justify-between items-end mb-2"><span class="text-[10px] font-black text-slate-500 uppercase">Production</span><span class="text-lg font-black text-blue-400">${m.salesCount}/6</span></div>
                         <div class="progress-bar-container"><div class="progress-bar bg-blue-500" style="width: ${(m.salesCount/6)*100}%"></div></div>
@@ -443,6 +507,12 @@
                     <img src="${m.img}" class="w-20 h-20 rounded-full ring-4 ring-white/5 mb-2">
                     <h3 class="text-md font-bold mb-2">${m.name}</h3>
                     ${!m.recruiting['Second Round Interview'] ? `<div class="mb-4"><div class="mission-badge" onclick="advanceInterview(${m.id})">Mission<div class="mission-tooltip"><p class="text-blue-400 font-bold mb-1">Next Step:</p><p class="text-sm">${curMission}</p></div></div></div>` : '<div class="h-4"></div>'}
+                    
+                    <div class="w-full mb-4">
+                        <span class="training-section-label">Work-Ons</span>
+                        <textarea class="workon-box" placeholder="Critical focus areas..." oninput="updateNotes('leader', ${m.id}, this.value)">${m.notes || ''}</textarea>
+                    </div>
+
                     <div class="w-full space-y-4">
                         <div class="space-y-1">
                             <div class="flex justify-between text-[9px] font-black text-slate-500 uppercase"><span>Cycle Progress</span><span>${m.sales.nhc + m.sales.wireless + m.sales.shm}/6</span></div>
